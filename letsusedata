@@ -1,0 +1,136 @@
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Firefox; // Added for FirefoxDriver
+using OpenQA.Selenium.Support.UI;
+using System;
+using System.Threading;
+using SeleniumExtras.WaitHelpers; // For ExpectedConditions
+
+
+
+/*
+ * @author: Mukendi Tshimanga
+ * QA - Methodology - Final Part 1
+ * 
+ * @Github link: https://github.com/mukenditshimanga/Final--Part1.git
+ * 
+ */
+
+namespace LetsUseDataLoginTests
+{
+    [TestClass]
+    public class LoginTests
+    {
+        private IWebDriver driver; 
+        private WebDriverWait wait; 
+        private string baseUrl;
+
+        [TestInitialize] 
+        public void SetupTest()
+        {
+            
+
+            driver = new FirefoxDriver();
+            // Implicit wait
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+
+            // Explicit wait
+            wait = new WebDriverWait(driver, TimeSpan.FromSeconds(20)); 
+            baseUrl = "https://letsusedata.com";
+        }
+
+        private void OpenLoginModal()
+        {
+            driver.Navigate().GoToUrl(baseUrl);
+
+            // Wait for the "Login" button in the navbar to be clickable and click it
+            IWebElement loginButtonNavbar = wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//a[contains(@class, 'loginButton') and normalize-space()='Login']")));
+            loginButtonNavbar.Click();
+
+            // Wait for the login modal to be visible
+            wait.Until(ExpectedConditions.ElementIsVisible(By.Id("logInModalLabel")));
+        }
+
+        [TestMethod]
+        public void TestSuccessfulLogin()
+        {
+            OpenLoginModal();
+
+            // Locate username and password fields within the modal
+            IWebElement usernameField = wait.Until(ExpectedConditions.ElementIsVisible(By.Id("username_login")));
+            IWebElement passwordField = driver.FindElement(By.Id("password_login"));
+
+            // Enter credentials
+            usernameField.Clear();
+            usernameField.SendKeys("test1");
+            passwordField.Clear();
+            passwordField.SendKeys("Test12456");
+
+            // Locate and click the login button in the modal
+            IWebElement loginButtonModal = driver.FindElement(By.XPath("//div[@id='logInModal']//button[normalize-space()='Login']"));
+            loginButtonModal.Click();
+
+            // Assert successful login
+            try
+            {
+                IWebElement successfulLoginIndicator = wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//a[contains(@class, 'loginButton') and normalize-space()='test1']")));
+                Assert.IsTrue(successfulLoginIndicator.Displayed, "Login was not successful, user indicator not found.");
+
+                // Also check for logout button
+                IWebElement logoutButton = wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//a[normalize-space()='Logout']")));
+                Assert.IsTrue(logoutButton.Displayed, "Logout button not found after successful login.");
+            }
+            catch (WebDriverTimeoutException)
+            {
+                Assert.Fail("Login was not successful within the timeout period. User indicator 'test1' or 'Logout' button not found.");
+            }
+
+            Thread.Sleep(2000); // Pause to observe
+        }
+
+        [TestMethod]
+        public void TestUnsuccessfulLogin()
+        {
+            OpenLoginModal();
+
+            IWebElement usernameField = wait.Until(ExpectedConditions.ElementIsVisible(By.Id("username_login")));
+            IWebElement passwordField = driver.FindElement(By.Id("password_login"));
+
+            usernameField.Clear();
+            usernameField.SendKeys("test1");
+            passwordField.Clear();
+            passwordField.SendKeys("test1234"); // Incorrect password
+
+            IWebElement loginButtonModal = driver.FindElement(By.XPath("//div[@id='logInModal']//button[normalize-space()='Login']"));
+            loginButtonModal.Click();
+
+            // Assert unsuccessful login by checking for an error message
+            // The error message appears in a div with id="login_feedback"
+            try
+            {
+                IWebElement errorMessageElement = wait.Until(ExpectedConditions.ElementIsVisible(By.Id("login_feedback")));
+                Assert.IsTrue(errorMessageElement.Displayed, "Error message element not visible.");
+                // The expected error message is "Invalid username or password"
+                StringAssert.Contains(errorMessageElement.Text, "Invalid username or password",
+                                      $"Error message text mismatch. Found: '{errorMessageElement.Text}'");
+            }
+            catch (WebDriverTimeoutException)
+            {
+                Assert.Fail("Error message for unsuccessful login not found within the timeout period.");
+            }
+
+            Thread.Sleep(2000); // Pause to observe
+        }
+
+        [TestCleanup] // Equivalent to Python's tearDown
+        public void CleanupTest()
+        {
+            if (driver != null)
+            {
+                driver.Quit();
+                driver.Dispose(); // Ensure all resources are released
+            }
+        }
+    }
+}
+
